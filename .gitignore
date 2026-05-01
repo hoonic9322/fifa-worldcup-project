@@ -1,0 +1,34 @@
+# Visual Studio / .NET
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ASP.NET local settings
+appsettings.Production.json
+appsettings.Local.json
+
+# Node / Vue
+node_modules/
+dist/
+.vite/
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.mdf
+*.ldf
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
