@@ -13,7 +13,9 @@
         <input v-model="password" type="password" placeholder="Enter password" />
       </label>
 
-      <button type="submit">Login</button>
+      <button type="submit" :disabled="isLoading">
+        {{ isLoading ? 'Logging in...' : 'Login' }}
+      </button>
     </form>
 
     <p v-if="message" class="message">{{ message }}</p>
@@ -23,22 +25,55 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { API_BASE_URL } from '../config/api'
 
 const router = useRouter()
 
 const username = ref('')
 const password = ref('')
 const message = ref('')
+const isLoading = ref(false)
 
-function handleLogin() {
+async function handleLogin() {
+  message.value = ''
+
   if (!username.value || !password.value) {
     message.value = 'Please enter username and password.'
     return
   }
 
-  // Temporary login for MVP frontend test
-  localStorage.setItem('memberUsername', username.value)
-  router.push('/question')
+  try {
+    isLoading.value = true
+
+    const response = await fetch(`${API_BASE_URL}/api/MemberAuth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: username.value,
+        password: password.value,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      message.value = result.message || 'Login failed.'
+      return
+    }
+
+    localStorage.setItem('memberId', result.member.id)
+    localStorage.setItem('memberUsername', result.member.username)
+    localStorage.setItem('memberPhoneNumber', result.member.phoneNumber || '')
+    localStorage.setItem('memberCreditBalance', result.member.creditBalance)
+
+    router.push('/question')
+  } catch (error) {
+    message.value = 'Unable to connect to server. Please try again.'
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -80,6 +115,11 @@ button {
   border: none;
   border-radius: 6px;
   cursor: pointer;
+}
+
+button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
 }
 
 .message {
