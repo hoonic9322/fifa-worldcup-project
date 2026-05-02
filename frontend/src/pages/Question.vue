@@ -30,14 +30,24 @@
         <textarea
           v-model="answers[question.id]"
           placeholder="Enter your answer"
-          :disabled="question.isLocked"
+          :disabled="question.isLocked || submittedQuestionIds.includes(question.id)"
         ></textarea>
 
         <button
           @click="submitAnswer(question)"
-          :disabled="question.isLocked"
+          :disabled="
+            question.isLocked ||
+            submittedQuestionIds.includes(question.id) ||
+            submittingQuestionId === question.id
+          "
         >
-          Submit Answer
+          {{
+            submittedQuestionIds.includes(question.id)
+              ? 'Submitted'
+              : submittingQuestionId === question.id
+                ? 'Submitting...'
+                : 'Submit Answer'
+          }}
         </button>
       </div>
     </div>
@@ -53,12 +63,15 @@ import { ref, onMounted } from 'vue'
 import { API_BASE_URL } from '../config/api'
 
 const username = localStorage.getItem('memberUsername') || 'Guest'
+const memberId = Number(localStorage.getItem('memberId') || 0)
 
 const questions = ref([])
 const answers = ref({})
+const submittedQuestionIds = ref([])
 const message = ref('')
 const errorMessage = ref('')
 const isLoading = ref(false)
+const submittingQuestionId = ref(null)
 
 async function loadQuestions() {
   try {
@@ -81,17 +94,50 @@ async function loadQuestions() {
   }
 }
 
-function submitAnswer(question) {
+async function submitAnswer(question) {
+  message.value = ''
+
+  if (!memberId) {
+    message.value = 'Please login again.'
+    return
+  }
+
   const answer = answers.value[question.id]
 
-  if (!answer) {
+  if (!answer || !answer.trim()) {
     message.value = 'Please enter your answer.'
     return
   }
 
-  // Temporary frontend-only submission.
-  // Real submit API will be added in next step.
-  message.value = `Answer for Question ${question.id} saved locally for testing.`
+  try {
+    submittingQuestionId.value = question.id
+
+    const response = await fetch(`${API_BASE_URL}/api/Answer/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        memberId,
+        questionId: question.id,
+        answerText: answer.trim(),
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      message.value = result.message || 'Submit answer failed.'
+      return
+    }
+
+    submittedQuestionIds.value.push(question.id)
+    message.value = result.message || 'Answer submitted successfully.'
+  } catch (error) {
+    message.value = 'Unable to connect to server. Please try again.'
+  } finally {
+    submittingQuestionId.value = null
+  }
 }
 
 onMounted(() => {
