@@ -3,12 +3,12 @@
     <aside class="sidebar">
       <h2>FIFA Admin</h2>
 
-      <nav>
-        <a class="active">Dashboard</a>
-        <a>Members</a>
-        <a>Answers</a>
-        <a>Export</a>
-      </nav>
+     <nav>
+        <router-link to="/admin" class="active">Dashboard</router-link>
+        <router-link to="/admin/members">Members</router-link>
+        <router-link to="/admin/answers">Answers</router-link>
+        <router-link to="/admin/export">Export</router-link>
+​        ​</nav>
     </aside>
 
     <main class="main-content">

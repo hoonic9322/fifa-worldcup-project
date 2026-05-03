@@ -5,6 +5,7 @@ import Login from '../pages/Login.vue'
 import Question from '../pages/Question.vue'
 import AdminLogin from '../pages/AdminLogin.vue'
 import AdminDashboard from '../pages/AdminDashboard.vue'
+import AdminMemberList from '../pages/AdminMemberList.vue'
 
 const routes = [
   {
@@ -31,6 +32,11 @@ const routes = [
     path: '/admin',
     name: 'AdminDashboard',
     component: AdminDashboard,
+  },
+  {
+  path: '/admin/members',
+  name: 'AdminMemberList',
+  component: AdminMemberList,
   },
 ]
 
