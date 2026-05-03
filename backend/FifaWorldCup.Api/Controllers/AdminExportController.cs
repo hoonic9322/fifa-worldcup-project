@@ -40,7 +40,7 @@ namespace FifaWorldCup.Api.Controllers
                         ON ma.MemberId = m.Id
                     INNER JOIN Questions q
                         ON ma.QuestionId = q.Id
-                    ORDER BY ma.CreatedAt DESC
+                    ORDER BY ma.CreatedAt DESC, ma.Id DESC
                 ";
 
                 using var command = new SqlCommand(sql, connection);
