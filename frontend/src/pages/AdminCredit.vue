@@ -1,3 +1,4 @@
+
 <template>
   <div class="admin-layout">
     <aside class="sidebar">
@@ -30,6 +31,42 @@
 
       <div v-if="successMessage" class="card success">
         {{ successMessage }}
+      </div>
+
+      <div v-if="lastCreditResult" class="balance-result-card">
+        <h3>Latest Credit Operation Result</h3>
+
+        <div class="balance-result-grid">
+          <div>
+            <span>Member ID</span>
+            <strong>{{ lastCreditResult.memberId }}</strong>
+          </div>
+
+          <div>
+            <span>Type</span>
+            <strong>{{ lastCreditResult.transactionType }}</strong>
+          </div>
+
+          <div>
+            <span>Amount</span>
+            <strong>{{ formatAmount(lastCreditResult.amount) }}</strong>
+          </div>
+
+          <div>
+            <span>Balance Before</span>
+            <strong>{{ formatAmount(lastCreditResult.balanceBefore) }}</strong>
+          </div>
+
+          <div>
+            <span>Balance After</span>
+            <strong>{{ formatAmount(lastCreditResult.balanceAfter) }}</strong>
+          </div>
+
+          <div>
+            <span>Current Balance</span>
+            <strong>{{ formatAmount(lastCreditResult.balanceAfter) }}</strong>
+          </div>
+        </div>
       </div>
 
       <section class="form-card">
@@ -94,7 +131,7 @@
             <p>Latest add / deduct / unlock credit records.</p>
           </div>
 
-          <button type="button" class="refresh-button" @click="loadTransactions">
+          <button type="button" class="refresh-button" @click="loadTransactions(filterMemberId)">
             Refresh
           </button>
         </div>
@@ -183,6 +220,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const transactions = ref([])
 const filterMemberId = ref('')
+const lastCreditResult = ref(null)
 
 function checkAdminLogin() {
   const adminId = localStorage.getItem('adminId')
@@ -203,6 +241,7 @@ async function changeCredit(action) {
   try {
     errorMessage.value = ''
     successMessage.value = ''
+    lastCreditResult.value = null
 
     if (!memberId.value || memberId.value <= 0) {
       errorMessage.value = 'Member ID is required.'
@@ -237,6 +276,8 @@ async function changeCredit(action) {
     }
 
     successMessage.value = result.message
+    lastCreditResult.value = result.data || null
+
     amount.value = 0
     remark.value = ''
 
@@ -426,6 +467,44 @@ nav a:hover {
 .success {
   color: #166534;
   text-align: center;
+}
+
+.balance-result-card {
+  margin-top: 28px;
+  padding: 20px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.balance-result-card h3 {
+  margin: 0 0 16px;
+  color: #166534;
+}
+
+.balance-result-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.balance-result-grid div {
+  padding: 14px;
+  border-radius: 8px;
+  background: white;
+}
+
+.balance-result-grid span {
+  display: block;
+  margin-bottom: 6px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.balance-result-grid strong {
+  color: #111827;
+  font-size: 18px;
 }
 
 .form-card h2,
