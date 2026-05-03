@@ -378,7 +378,6 @@ onMounted(async () => {
   await loadTransactions()
 })
 </script>
-
 <style scoped>
 .admin-layout {
   min-height: 100vh;
@@ -392,6 +391,7 @@ onMounted(async () => {
   padding: 24px;
   background: #111827;
   color: white;
+  flex-shrink: 0;
 }
 
 .sidebar h2 {
@@ -420,8 +420,8 @@ nav a:hover {
 
 .main-content {
   flex: 1;
-  padding: 32px;
-  overflow-x: hidden;
+  padding: 32px 40px;
+  overflow-x: auto;
 }
 
 .top-bar {
@@ -457,6 +457,10 @@ nav a:hover {
   border-radius: 10px;
   background: white;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.table-card {
+  overflow: hidden;
 }
 
 .error {
@@ -610,13 +614,15 @@ input {
   width: 100%;
   margin-top: 18px;
   overflow-x: auto;
+  padding-bottom: 8px;
 }
 
 table {
   width: 100%;
-  min-width: 1050px;
+  min-width: 1080px;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: fixed;
 }
 
 th {
@@ -635,20 +641,65 @@ td {
   vertical-align: top;
 }
 
+th:nth-child(1),
+td:nth-child(1) {
+  width: 120px;
+  min-width: 120px;
+}
+
+th:nth-child(2),
+td:nth-child(2) {
+  width: 100px;
+  min-width: 100px;
+}
+
+th:nth-child(3),
+td:nth-child(3) {
+  width: 130px;
+  min-width: 130px;
+}
+
+th:nth-child(4),
+td:nth-child(4) {
+  width: 110px;
+  min-width: 110px;
+}
+
+th:nth-child(5),
 td:nth-child(5),
+th:nth-child(6),
 td:nth-child(6),
+th:nth-child(7),
 td:nth-child(7) {
+  width: 100px;
+  min-width: 100px;
   text-align: right;
 }
 
+th:nth-child(8),
+td:nth-child(8) {
+  width: 220px;
+  min-width: 220px;
+}
+
+th:nth-child(9),
+td:nth-child(9) {
+  width: 100px;
+  min-width: 100px;
+}
+
+th:nth-child(10),
+td:nth-child(10) {
+  width: 170px;
+  min-width: 170px;
+}
+
 .remark-cell {
-  max-width: 180px;
   white-space: normal;
   word-break: break-word;
 }
 
 .date-cell {
-  min-width: 160px;
   white-space: nowrap;
 }
 
