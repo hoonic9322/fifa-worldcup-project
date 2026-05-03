@@ -41,6 +41,12 @@
               @keyup.enter="searchMembers"
             />
 
+            <select v-model="answerStatus">
+              <option value="all">All</option>
+              <option value="answered">Answered</option>
+              <option value="notAnswered">Not Answered</option>
+            </select>
+
             <button type="button" class="search-button" @click="searchMembers">
               Search
             </button>
@@ -60,6 +66,7 @@
                 <th>Phone Number</th>
                 <th>Credit Balance</th>
                 <th>Answered Count</th>
+                <th>Answer Status</th>
                 <th>Last Answer Time</th>
                 <th>Created At</th>
               </tr>
@@ -67,7 +74,7 @@
 
             <tbody>
               <tr v-if="members.length === 0">
-                <td colspan="7" class="empty">
+                <td colspan="8" class="empty">
                   No members found.
                 </td>
               </tr>
@@ -78,6 +85,13 @@
                 <td>{{ member.phoneNumber || '-' }}</td>
                 <td>{{ member.creditBalance }}</td>
                 <td>{{ member.answeredCount }}</td>
+                <td>
+                  <span
+                    :class="member.answeredCount > 0 ? 'status answered' : 'status not-answered'"
+                  >
+                    {{ member.answeredCount > 0 ? 'Answered' : 'Not Answered' }}
+                  </span>
+                </td>
                 <td>{{ formatDateTime(member.lastAnswerTime) }}</td>
                 <td>{{ formatDateTime(member.createdAt) }}</td>
               </tr>
@@ -101,6 +115,7 @@ const loading = ref(true)
 const errorMessage = ref('')
 const members = ref([])
 const keyword = ref('')
+const answerStatus = ref('all')
 
 function checkAdminLogin() {
   const adminId = localStorage.getItem('adminId')
@@ -113,12 +128,23 @@ function checkAdminLogin() {
   return true
 }
 
-async function loadMembers(searchKeyword = '') {
-  const query = searchKeyword
-    ? `?keyword=${encodeURIComponent(searchKeyword)}`
-    : ''
+async function loadMembers(searchKeyword = '', selectedAnswerStatus = 'all') {
+  const queryParams = new URLSearchParams()
 
-  const response = await fetch(`${API_BASE_URL}/api/AdminMember/list${query}`)
+  if (searchKeyword) {
+    queryParams.append('keyword', searchKeyword)
+  }
+
+  if (selectedAnswerStatus && selectedAnswerStatus !== 'all') {
+    queryParams.append('answerStatus', selectedAnswerStatus)
+  }
+
+  const query = queryParams.toString()
+  const url = query
+    ? `${API_BASE_URL}/api/AdminMember/list?${query}`
+    : `${API_BASE_URL}/api/AdminMember/list`
+
+  const response = await fetch(url)
   const result = await response.json()
 
   if (!response.ok || result.status !== 'OK') {
@@ -133,7 +159,7 @@ async function searchMembers() {
     loading.value = true
     errorMessage.value = ''
 
-    await loadMembers(keyword.value.trim())
+    await loadMembers(keyword.value.trim(), answerStatus.value)
   } catch (error) {
     errorMessage.value = error.message || 'Failed to search member list.'
   } finally {
@@ -143,6 +169,7 @@ async function searchMembers() {
 
 async function resetSearch() {
   keyword.value = ''
+  answerStatus.value = 'all'
 
   try {
     loading.value = true
@@ -300,6 +327,22 @@ nav a:hover {
   font-size: 14px;
 }
 
+.search-row select {
+  width: 190px;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #ffffff;
+  color: #111827;
+  cursor: pointer;
+}
+
+.search-row select option {
+  color: #111827;
+  background-color: #ffffff;
+}
+
 .search-button,
 .reset-button {
   padding: 10px 16px;
@@ -335,6 +378,24 @@ td {
   padding: 12px;
   border-bottom: 1px solid #e5e7eb;
   color: #111827;
+}
+
+.status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.answered {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.not-answered {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .empty {
