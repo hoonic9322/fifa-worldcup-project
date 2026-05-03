@@ -1,0 +1,228 @@
+<template>
+  <div class="admin-layout">
+    <aside class="sidebar">
+      <h2>FIFA Admin</h2>
+
+      <nav>
+        <router-link to="/admin">Dashboard</router-link>
+        <router-link to="/admin/members">Members</router-link>
+        <router-link to="/admin/answers">Answers</router-link>
+        <router-link to="/admin/export" class="active">Export</router-link>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <div class="top-bar">
+        <div>
+          <h1>Export Data</h1>
+          <p>Export campaign answer data for Excel review.</p>
+        </div>
+
+        <button type="button" class="logout-button" @click="logout">
+          Logout
+        </button>
+      </div>
+
+      <div class="export-card">
+        <h2>Answer Export</h2>
+        <p>
+          Download all submitted member answers as a CSV file.
+          The file can be opened using Microsoft Excel.
+        </p>
+
+        <button
+          type="button"
+          class="export-button"
+          :disabled="loading"
+          @click="exportAnswers"
+        >
+          {{ loading ? 'Downloading...' : 'Download Answer CSV' }}
+        </button>
+
+        <p v-if="errorMessage" class="error-message">
+          {{ errorMessage }}
+        </p>
+      </div>
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
+const API_BASE_URL = 'https://localhost:7160'
+
+const loading = ref(false)
+const errorMessage = ref('')
+
+function checkAdminLogin() {
+  const adminId = localStorage.getItem('adminId')
+
+  if (!adminId) {
+    router.push('/admin/login')
+    return false
+  }
+
+  return true
+}
+
+async function exportAnswers() {
+  try {
+    errorMessage.value = ''
+    loading.value = true
+
+    const response = await fetch(`${API_BASE_URL}/api/AdminExport/answers`)
+
+    if (!response.ok) {
+      throw new Error('Failed to export answer CSV.')
+    }
+
+    const blob = await response.blob()
+
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    const fileName = `fifa-worldcup-answers-${new Date()
+      .toISOString()
+      .replace(/[-:T.]/g, '')
+      .slice(0, 14)}.csv`
+
+    link.href = downloadUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+
+    link.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+  } catch (error) {
+    errorMessage.value = error.message || 'Unexpected error occurred.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function logout() {
+  localStorage.removeItem('adminId')
+  localStorage.removeItem('adminUsername')
+  localStorage.removeItem('adminDisplayName')
+
+  router.push('/admin/login')
+}
+
+onMounted(() => {
+  checkAdminLogin()
+})
+</script>
+
+<style scoped>
+.admin-layout {
+  min-height: 100vh;
+  display: flex;
+  background: #f3f4f6;
+  font-family: Arial, sans-serif;
+}
+
+.sidebar {
+  width: 240px;
+  padding: 24px;
+  background: #111827;
+  color: white;
+}
+
+.sidebar h2 {
+  margin: 0 0 28px;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+nav a {
+  padding: 10px 12px;
+  border-radius: 6px;
+  color: #d1d5db;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+nav a.active,
+nav a:hover {
+  background: #1f2937;
+  color: white;
+}
+
+.main-content {
+  flex: 1;
+  padding: 32px;
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.top-bar h1 {
+  margin: 0;
+  color: #111827;
+}
+
+.top-bar p {
+  margin: 6px 0 0;
+  color: #6b7280;
+}
+
+.logout-button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #dc2626;
+  color: white;
+  cursor: pointer;
+}
+
+.export-card {
+  margin-top: 28px;
+  max-width: 560px;
+  padding: 28px;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.export-card h2 {
+  margin: 0 0 12px;
+  color: #111827;
+}
+
+.export-card p {
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.export-button {
+  margin-top: 18px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.export-button:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.error-message {
+  margin-top: 16px;
+  color: #dc2626;
+}
+</style>

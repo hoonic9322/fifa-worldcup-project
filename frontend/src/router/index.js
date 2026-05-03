@@ -7,6 +7,7 @@ import AdminLogin from '../pages/AdminLogin.vue'
 import AdminDashboard from '../pages/AdminDashboard.vue'
 import AdminMemberList from '../pages/AdminMemberList.vue'
 import AdminAnswerList from '../pages/AdminAnswerList.vue'
+import AdminExport from '../pages/AdminExport.vue'
 
 const routes = [
   {
@@ -44,6 +45,11 @@ const routes = [
   name: 'AdminAnswerList',
   component: AdminAnswerList,
   },
+  {
+  path: '/admin/export',
+  name: 'AdminExport',
+  component: AdminExport,
+},
 ]
 
 const router = createRouter({
