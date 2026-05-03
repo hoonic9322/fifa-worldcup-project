@@ -99,6 +99,23 @@
           </button>
         </div>
 
+        <div class="transaction-filter">
+          <input
+            v-model="filterMemberId"
+            type="number"
+            placeholder="Filter by Member ID"
+            @keyup.enter="searchTransactions"
+          />
+
+          <button type="button" class="search-button" @click="searchTransactions">
+            Search
+          </button>
+
+          <button type="button" class="reset-button" @click="resetTransactionFilter">
+            Reset
+          </button>
+        </div>
+
         <div class="table-scroll">
           <table>
             <thead>
@@ -165,6 +182,7 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const transactions = ref([])
+const filterMemberId = ref('')
 
 function checkAdminLogin() {
   const adminId = localStorage.getItem('adminId')
@@ -222,7 +240,7 @@ async function changeCredit(action) {
     amount.value = 0
     remark.value = ''
 
-    await loadTransactions()
+    await loadTransactions(filterMemberId.value)
   } catch (error) {
     errorMessage.value = error.message || 'Unexpected error occurred.'
   } finally {
@@ -230,11 +248,15 @@ async function changeCredit(action) {
   }
 }
 
-async function loadTransactions() {
+async function loadTransactions(memberIdFilter = '') {
   try {
     errorMessage.value = ''
 
-    const response = await fetch(`${API_BASE_URL}/api/AdminCredit/transactions`)
+    const query = memberIdFilter
+      ? `?memberId=${memberIdFilter}`
+      : ''
+
+    const response = await fetch(`${API_BASE_URL}/api/AdminCredit/transactions${query}`)
     const result = await response.json()
 
     if (!response.ok || result.status !== 'OK') {
@@ -245,6 +267,20 @@ async function loadTransactions() {
   } catch (error) {
     errorMessage.value = error.message || 'Failed to load credit transactions.'
   }
+}
+
+async function searchTransactions() {
+  if (!filterMemberId.value) {
+    await loadTransactions()
+    return
+  }
+
+  await loadTransactions(filterMemberId.value)
+}
+
+async function resetTransactionFilter() {
+  filterMemberId.value = ''
+  await loadTransactions()
 }
 
 function logout() {
@@ -434,7 +470,9 @@ input {
 
 .add-button,
 .deduct-button,
-.refresh-button {
+.refresh-button,
+.search-button,
+.reset-button {
   padding: 10px 16px;
   border: none;
   border-radius: 6px;
@@ -450,8 +488,13 @@ input {
   background: #dc2626;
 }
 
-.refresh-button {
+.refresh-button,
+.search-button {
   background: #2563eb;
+}
+
+.reset-button {
+  background: #6b7280;
 }
 
 .add-button:disabled,
@@ -469,6 +512,19 @@ input {
 .section-header p {
   margin: 4px 0 0;
   color: #6b7280;
+}
+
+.transaction-filter {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.transaction-filter input {
+  width: 220px;
 }
 
 .table-scroll {
