@@ -1,238 +1,265 @@
 <template>
-  <div class="page">
-    <h1>World Cup Questions</h1>
+  <div class="question-page">
+    <h1>FIFA World Cup Question</h1>
 
-    <p class="welcome">Welcome, {{ username }}</p>
-
-    <div v-if="isLoading" class="loading">
-      Loading questions...
+    <div v-if="loading" class="card">
+      Loading...
     </div>
 
-    <div v-else-if="errorMessage" class="error">
+    <div v-else-if="errorMessage" class="card error">
       {{ errorMessage }}
     </div>
 
     <div v-else>
-      <div
-        v-for="question in questions"
-        :key="question.id"
-        class="question-box"
-      >
-        <div class="question-header">
-          <span class="pool-type">{{ question.prizePoolType }}</span>
-          <span v-if="question.isLocked" class="locked">Locked</span>
-          <span v-else class="unlocked">Unlocked</span>
+      <!-- Submitted Answer View -->
+      <div v-if="submittedAnswer" class="card submitted-box">
+        <h2>You have submitted your answer</h2>
+
+        <p>
+          <strong>Question ID:</strong>
+          {{ submittedAnswer.questionId }}
+        </p>
+
+        <p>
+          <strong>Your Answer:</strong>
+          {{ submittedAnswer.answerText }}
+        </p>
+
+        <p>
+          <strong>Submitted Time:</strong>
+          {{ formatDateTime(submittedAnswer.submittedAt) }}
+        </p>
+      </div>
+
+      <!-- Answer Form -->
+      <div v-else class="card">
+        <h2>Question List</h2>
+
+        <div v-if="questions.length === 0">
+          No questions found.
         </div>
 
-        <h2>Question {{ question.id }}</h2>
-        <p>{{ question.questionText }}</p>
-
-        <textarea
-          v-model="answers[question.id]"
-          placeholder="Enter your answer"
-          :disabled="question.isLocked || submittedQuestionIds.includes(question.id)"
-        ></textarea>
-
-        <button
-          @click="submitAnswer(question)"
-          :disabled="
-            question.isLocked ||
-            submittedQuestionIds.includes(question.id) ||
-            submittingQuestionId === question.id
-          "
+        <div
+          v-for="question in questions"
+          :key="question.id"
+          class="question-item"
         >
-          {{
-            submittedQuestionIds.includes(question.id)
-              ? 'Submitted'
-              : submittingQuestionId === question.id
-                ? 'Submitting...'
-                : 'Submit Answer'
-          }}
-        </button>
+          <p>
+            <strong>{{ question.prizePoolType }}</strong>
+          </p>
+
+          <p>{{ question.questionText }}</p>
+
+          <input
+            v-model="answers[question.id]"
+            type="text"
+            placeholder="Enter your answer"
+            class="answer-input"
+          />
+
+          <button
+            type="button"
+            class="submit-button"
+            @click="submitAnswer(question.id)"
+          >
+            Submit Answer
+          </button>
+        </div>
       </div>
     </div>
-
-    <p v-if="message" class="message">{{ message }}</p>
-
-    <RouterLink to="/" class="back-link">Back to Home</RouterLink>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { API_BASE_URL } from '../config/api'
+import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
-const username = localStorage.getItem('memberUsername') || 'Guest'
-const memberId = Number(localStorage.getItem('memberId') || 0)
+const router = useRouter()
 
-const questions = ref([])
-const answers = ref({})
-const submittedQuestionIds = ref([])
-const message = ref('')
+const API_BASE_URL = 'https://localhost:7160'
+
+const loading = ref(true)
 const errorMessage = ref('')
-const isLoading = ref(false)
-const submittingQuestionId = ref(null)
+const questions = ref([])
+const submittedAnswer = ref(null)
+const answers = reactive({})
+
+function getMemberId() {
+  const directMemberId = localStorage.getItem('memberId')
+
+  if (directMemberId) {
+    return Number(directMemberId)
+  }
+
+  const memberInfo = localStorage.getItem('memberInfo')
+
+  if (memberInfo) {
+    try {
+      const parsedMemberInfo = JSON.parse(memberInfo)
+      return Number(parsedMemberInfo.id || parsedMemberInfo.memberId)
+    } catch {
+      return 0
+    }
+  }
+
+  return 0
+}
 
 async function loadQuestions() {
+  const response = await fetch(`${API_BASE_URL}/api/Question/list`)
+
+  const result = await response.json()
+
+  if (!response.ok || result.status !== 'OK') {
+    throw new Error(result.message || 'Failed to load question list.')
+  }
+
+  questions.value = result.data || []
+}
+
+async function loadSubmittedAnswer(memberId) {
+  const response = await fetch(`${API_BASE_URL}/api/Answer/member/${memberId}`)
+
+  const result = await response.json()
+
+  if (!response.ok || result.status !== 'OK') {
+    throw new Error(result.message || 'Failed to load submitted answer.')
+  }
+
+  submittedAnswer.value = result.data
+}
+
+async function submitAnswer(questionId) {
   try {
-    isLoading.value = true
-    errorMessage.value = ''
+    const memberId = getMemberId()
 
-    const response = await fetch(`${API_BASE_URL}/api/Question/list`)
-    const result = await response.json()
-
-    if (!response.ok) {
-      errorMessage.value = result.message || 'Failed to load questions.'
+    if (!memberId) {
+      alert('Please login first.')
+      router.push('/login')
       return
     }
 
-    questions.value = result.data || []
-  } catch (error) {
-    errorMessage.value = 'Unable to connect to server. Please try again.'
-  } finally {
-    isLoading.value = false
-  }
-}
+    const answerText = answers[questionId]
 
-async function submitAnswer(question) {
-  message.value = ''
-
-  if (!memberId) {
-    message.value = 'Please login again.'
-    return
-  }
-
-  const answer = answers.value[question.id]
-
-  if (!answer || !answer.trim()) {
-    message.value = 'Please enter your answer.'
-    return
-  }
-
-  try {
-    submittingQuestionId.value = question.id
+    if (!answerText || !answerText.trim()) {
+      alert('Please enter your answer.')
+      return
+    }
 
     const response = await fetch(`${API_BASE_URL}/api/Answer/submit`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         memberId,
-        questionId: question.id,
-        answerText: answer.trim(),
-      }),
+        questionId,
+        answerText: answerText.trim()
+      })
     })
 
     const result = await response.json()
 
-    if (!response.ok) {
-      message.value = result.message || 'Submit answer failed.'
+    if (!response.ok || result.status !== 'OK') {
+      alert(result.message || 'Failed to submit answer.')
       return
     }
 
-    submittedQuestionIds.value.push(question.id)
-    message.value = result.message || 'Answer submitted successfully.'
+    alert('Answer submitted successfully.')
+
+    await loadSubmittedAnswer(memberId)
   } catch (error) {
-    message.value = 'Unable to connect to server. Please try again.'
-  } finally {
-    submittingQuestionId.value = null
+    alert(error.message || 'Unexpected error occurred.')
   }
 }
 
-onMounted(() => {
-  loadQuestions()
+function formatDateTime(value) {
+  if (!value) {
+    return '-'
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleString()
+}
+
+onMounted(async () => {
+  try {
+    loading.value = true
+    errorMessage.value = ''
+
+    const memberId = getMemberId()
+
+    if (!memberId) {
+      router.push('/login')
+      return
+    }
+
+    await loadQuestions()
+    await loadSubmittedAnswer(memberId)
+  } catch (error) {
+    errorMessage.value = error.message || 'Failed to load page.'
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 
 <style scoped>
-.page {
-  max-width: 800px;
-  margin: 60px auto;
-  padding: 24px;
+.question-page {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
 }
 
-h1 {
-  text-align: center;
-  margin-bottom: 12px;
-}
-
-.welcome {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-.loading,
-.error {
-  text-align: center;
-  margin: 24px 0;
+.card {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .error {
-  color: #dc2626;
+  color: #b00020;
+  border-color: #b00020;
 }
 
-.question-box {
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 24px;
-  margin-bottom: 20px;
+.submitted-box {
+  background: #f0fff4;
+  border-color: #8fd19e;
 }
 
-.question-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
+.question-item {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid #eeeeee;
+  border-radius: 6px;
 }
 
-.pool-type {
-  font-weight: 700;
-  color: #1d4ed8;
-}
-
-.locked {
-  color: #dc2626;
-  font-weight: 700;
-}
-
-.unlocked {
-  color: #16a34a;
-  font-weight: 700;
-}
-
-textarea {
+.answer-input {
   width: 100%;
-  min-height: 100px;
-  margin-top: 12px;
   padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  margin-top: 10px;
+  box-sizing: border-box;
 }
 
-button {
-  margin-top: 16px;
-  padding: 12px 20px;
-  background: #dc2626;
-  color: white;
+.submit-button {
+  margin-top: 12px;
+  padding: 10px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
+  background: #1976d2;
+  color: white;
   cursor: pointer;
 }
 
-button:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-}
-
-.message {
-  margin-top: 16px;
-  color: #16a34a;
-  text-align: center;
-}
-
-.back-link {
-  display: block;
-  margin-top: 24px;
-  text-align: center;
+.submit-button:hover {
+  background: #125aa0;
 }
 </style>

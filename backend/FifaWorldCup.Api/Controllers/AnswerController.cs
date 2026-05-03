@@ -3,8 +3,8 @@ using Microsoft.Data.SqlClient;
 
 namespace FifaWorldCup.Api.Controllers
 {
-    [ApiController]
     [Route("api/[controller]")]
+    [ApiController]
     public class AnswerController : ControllerBase
     {
         private readonly IConfiguration _configuration;
@@ -14,166 +14,186 @@ namespace FifaWorldCup.Api.Controllers
             _configuration = configuration;
         }
 
+        // POST: api/Answer/submit
         [HttpPost("submit")]
-        public async Task<IActionResult> SubmitAnswer([FromBody] SubmitAnswerRequest request)
+        public IActionResult SubmitAnswer([FromBody] SubmitAnswerRequest request)
         {
-            if (request.MemberId <= 0)
+            try
             {
-                return BadRequest(new
-                {
-                    status = "FAILED",
-                    message = "MemberId is required."
-                });
-            }
-
-            if (request.QuestionId <= 0)
-            {
-                return BadRequest(new
-                {
-                    status = "FAILED",
-                    message = "QuestionId is required."
-                });
-            }
-
-            if (string.IsNullOrWhiteSpace(request.AnswerText))
-            {
-                return BadRequest(new
-                {
-                    status = "FAILED",
-                    message = "AnswerText is required."
-                });
-            }
-
-            var connectionString = _configuration.GetConnectionString("DefaultConnection");
-
-            if (string.IsNullOrWhiteSpace(connectionString))
-            {
-                return StatusCode(500, new
-                {
-                    status = "FAILED",
-                    message = "Database connection is not configured."
-                });
-            }
-
-            await using var connection = new SqlConnection(connectionString);
-            await connection.OpenAsync();
-
-            // 1. Check member exists
-            const string checkMemberSql = @"
-                SELECT COUNT(1)
-                FROM Members
-                WHERE Id = @MemberId;
-            ";
-
-            await using (var checkMemberCommand = new SqlCommand(checkMemberSql, connection))
-            {
-                checkMemberCommand.Parameters.AddWithValue("@MemberId", request.MemberId);
-
-                var memberCount = (int)await checkMemberCommand.ExecuteScalarAsync();
-
-                if (memberCount == 0)
-                {
-                    return NotFound(new
-                    {
-                        status = "FAILED",
-                        message = "Member not found."
-                    });
-                }
-            }
-
-            // 2. Check question exists and is not locked
-            const string checkQuestionSql = @"
-                SELECT IsLocked
-                FROM Questions
-                WHERE Id = @QuestionId;
-            ";
-
-            bool isLocked;
-
-            await using (var checkQuestionCommand = new SqlCommand(checkQuestionSql, connection))
-            {
-                checkQuestionCommand.Parameters.AddWithValue("@QuestionId", request.QuestionId);
-
-                var result = await checkQuestionCommand.ExecuteScalarAsync();
-
-                if (result == null)
-                {
-                    return NotFound(new
-                    {
-                        status = "FAILED",
-                        message = "Question not found."
-                    });
-                }
-
-                isLocked = (bool)result;
-            }
-
-            if (isLocked)
-            {
-                return BadRequest(new
-                {
-                    status = "FAILED",
-                    message = "This question is locked."
-                });
-            }
-
-            // 3. Prevent duplicate answer for same member + question
-            const string checkExistingAnswerSql = @"
-                SELECT COUNT(1)
-                FROM MemberAnswers
-                WHERE MemberId = @MemberId
-                  AND QuestionId = @QuestionId;
-            ";
-
-            await using (var checkAnswerCommand = new SqlCommand(checkExistingAnswerSql, connection))
-            {
-                checkAnswerCommand.Parameters.AddWithValue("@MemberId", request.MemberId);
-                checkAnswerCommand.Parameters.AddWithValue("@QuestionId", request.QuestionId);
-
-                var answerCount = (int)await checkAnswerCommand.ExecuteScalarAsync();
-
-                if (answerCount > 0)
+                if (request == null)
                 {
                     return BadRequest(new
                     {
-                        status = "FAILED",
-                        message = "You have already answered this question."
+                        status = "ERROR",
+                        message = "Invalid request."
                     });
                 }
-            }
 
-            // 4. Insert answer
-            const string insertSql = @"
-                INSERT INTO MemberAnswers (
-                    MemberId,
-                    QuestionId,
-                    AnswerText
-                )
-                OUTPUT INSERTED.Id
-                VALUES (
-                    @MemberId,
-                    @QuestionId,
-                    @AnswerText
-                );
-            ";
+                if (request.MemberId <= 0)
+                {
+                    return BadRequest(new
+                    {
+                        status = "ERROR",
+                        message = "MemberId is required."
+                    });
+                }
 
-            int answerId;
+                if (request.QuestionId <= 0)
+                {
+                    return BadRequest(new
+                    {
+                        status = "ERROR",
+                        message = "QuestionId is required."
+                    });
+                }
 
-            await using (var insertCommand = new SqlCommand(insertSql, connection))
-            {
+                if (string.IsNullOrWhiteSpace(request.AnswerText))
+                {
+                    return BadRequest(new
+                    {
+                        status = "ERROR",
+                        message = "Answer text is required."
+                    });
+                }
+
+                using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+                connection.Open();
+
+                // Check duplicate answer
+                var checkSql = @"
+                    SELECT COUNT(1)
+                    FROM MemberAnswers
+                    WHERE MemberId = @MemberId
+                ";
+
+                using (var checkCommand = new SqlCommand(checkSql, connection))
+                {
+                    checkCommand.Parameters.AddWithValue("@MemberId", request.MemberId);
+
+                    var existingCount = (int)checkCommand.ExecuteScalar();
+
+                    if (existingCount > 0)
+                    {
+                        return BadRequest(new
+                        {
+                            status = "ERROR",
+                            message = "You have already submitted an answer."
+                        });
+                    }
+                }
+
+                // Insert answer
+                var insertSql = @"
+                    INSERT INTO MemberAnswers
+                    (
+                        MemberId,
+                        QuestionId,
+                        AnswerText,
+                        CreatedAt
+                    )
+                    VALUES
+                    (
+                        @MemberId,
+                        @QuestionId,
+                        @AnswerText,
+                        GETDATE()
+                    )
+                ";
+
+                using var insertCommand = new SqlCommand(insertSql, connection);
                 insertCommand.Parameters.AddWithValue("@MemberId", request.MemberId);
                 insertCommand.Parameters.AddWithValue("@QuestionId", request.QuestionId);
                 insertCommand.Parameters.AddWithValue("@AnswerText", request.AnswerText.Trim());
 
-                answerId = (int)await insertCommand.ExecuteScalarAsync();
-            }
+                insertCommand.ExecuteNonQuery();
 
-            return Ok(new
+                return Ok(new
+                {
+                    status = "OK",
+                    message = "Answer submitted successfully."
+                });
+            }
+            catch (Exception ex)
             {
-                status = "OK",
-                message = "Answer submitted successfully.",
-                answerId
-            });
+                return StatusCode(500, new
+                {
+                    status = "ERROR",
+                    message = "Failed to submit answer.",
+                    error = ex.Message
+                });
+            }
+        }
+
+        // GET: api/Answer/member/1
+        [HttpGet("member/{memberId}")]
+        public IActionResult GetSubmittedAnswer(int memberId)
+        {
+            try
+            {
+                if (memberId <= 0)
+                {
+                    return BadRequest(new
+                    {
+                        status = "ERROR",
+                        message = "Invalid memberId."
+                    });
+                }
+
+                using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
+                connection.Open();
+
+                var sql = @"
+                    SELECT TOP 1
+                        Id,
+                        MemberId,
+                        QuestionId,
+                        AnswerText,
+                        CreatedAt
+                    FROM MemberAnswers
+                    WHERE MemberId = @MemberId
+                    ORDER BY CreatedAt DESC
+                ";
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@MemberId", memberId);
+
+                using var reader = command.ExecuteReader();
+
+                if (!reader.Read())
+                {
+                    return Ok(new
+                    {
+                        status = "OK",
+                        message = "No submitted answer found.",
+                        data = (object?)null
+                    });
+                }
+
+                var answer = new
+                {
+                    id = reader.GetInt32(reader.GetOrdinal("Id")),
+                    memberId = reader.GetInt32(reader.GetOrdinal("MemberId")),
+                    questionId = reader.GetInt32(reader.GetOrdinal("QuestionId")),
+                    answerText = reader.GetString(reader.GetOrdinal("AnswerText")),
+                    submittedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt"))
+                };
+
+                return Ok(new
+                {
+                    status = "OK",
+                    message = "Submitted answer loaded successfully.",
+                    data = answer
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    status = "ERROR",
+                    message = "Failed to load submitted answer.",
+                    error = ex.Message
+                });
+            }
         }
     }
 
