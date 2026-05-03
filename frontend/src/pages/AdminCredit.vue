@@ -91,7 +91,7 @@
         <div class="section-header">
           <div>
             <h2>Credit Transaction Log</h2>
-            <p>Latest add / deduct credit records.</p>
+            <p>Latest add / deduct / unlock credit records.</p>
           </div>
 
           <button type="button" class="refresh-button" @click="loadTransactions">
@@ -99,56 +99,52 @@
           </button>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Transaction ID</th>
-              <th>Member ID</th>
-              <th>Username</th>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>Before</th>
-              <th>After</th>
-              <th>Remark</th>
-              <th>Admin</th>
-              <th>Created At</th>
-            </tr>
-          </thead>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Transaction ID</th>
+                <th>Member ID</th>
+                <th>Username</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Before</th>
+                <th>After</th>
+                <th>Remark</th>
+                <th>Admin</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
 
-          <tbody>
-            <tr v-if="transactions.length === 0">
-              <td colspan="10" class="empty">
-                No credit transactions found.
-              </td>
-            </tr>
+            <tbody>
+              <tr v-if="transactions.length === 0">
+                <td colspan="10" class="empty">
+                  No credit transactions found.
+                </td>
+              </tr>
 
-            <tr
-              v-for="transaction in transactions"
-              :key="transaction.transactionId"
-            >
-              <td>{{ transaction.transactionId }}</td>
-              <td>{{ transaction.memberId }}</td>
-              <td>{{ transaction.username }}</td>
-              <td>
-                <span
-                  :class="
-                    transaction.transactionType === 'ADD'
-                      ? 'type add'
-                      : 'type deduct'
-                  "
-                >
-                  {{ transaction.transactionType }}
-                </span>
-              </td>
-              <td>{{ formatAmount(transaction.amount) }}</td>
-              <td>{{ formatAmount(transaction.balanceBefore) }}</td>
-              <td>{{ formatAmount(transaction.balanceAfter) }}</td>
-              <td>{{ transaction.remark || '-' }}</td>
-              <td>{{ transaction.adminUsername || '-' }}</td>
-              <td>{{ formatDateTime(transaction.createdAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
+              <tr
+                v-for="transaction in transactions"
+                :key="transaction.transactionId"
+              >
+                <td>{{ transaction.transactionId }}</td>
+                <td>{{ transaction.memberId }}</td>
+                <td>{{ transaction.username }}</td>
+                <td>
+                  <span :class="getTransactionTypeClass(transaction.transactionType)">
+                    {{ transaction.transactionType }}
+                  </span>
+                </td>
+                <td>{{ formatAmount(transaction.amount) }}</td>
+                <td>{{ formatAmount(transaction.balanceBefore) }}</td>
+                <td>{{ formatAmount(transaction.balanceAfter) }}</td>
+                <td class="remark-cell">{{ transaction.remark || '-' }}</td>
+                <td>{{ transaction.adminUsername || '-' }}</td>
+                <td class="date-cell">{{ formatDateTime(transaction.createdAt) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   </div>
@@ -259,6 +255,22 @@ function logout() {
   router.push('/admin/login')
 }
 
+function getTransactionTypeClass(transactionType) {
+  if (transactionType === 'ADD') {
+    return 'type add'
+  }
+
+  if (transactionType === 'DEDUCT') {
+    return 'type deduct'
+  }
+
+  if (transactionType === 'UNLOCK') {
+    return 'type unlock'
+  }
+
+  return 'type default'
+}
+
 function formatAmount(value) {
   if (value === null || value === undefined) {
     return '0.00'
@@ -332,7 +344,7 @@ nav a:hover {
 .main-content {
   flex: 1;
   padding: 32px;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .top-bar {
@@ -372,10 +384,12 @@ nav a:hover {
 
 .error {
   color: #dc2626;
+  text-align: center;
 }
 
 .success {
   color: #166534;
+  text-align: center;
 }
 
 .form-card h2,
@@ -457,9 +471,15 @@ input {
   color: #6b7280;
 }
 
-table {
+.table-scroll {
   width: 100%;
   margin-top: 18px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 1050px;
   border-collapse: collapse;
   font-size: 14px;
 }
@@ -470,12 +490,31 @@ th {
   border-bottom: 1px solid #e5e7eb;
   text-align: left;
   color: #374151;
+  white-space: nowrap;
 }
 
 td {
   padding: 12px;
   border-bottom: 1px solid #e5e7eb;
   color: #111827;
+  vertical-align: top;
+}
+
+td:nth-child(5),
+td:nth-child(6),
+td:nth-child(7) {
+  text-align: right;
+}
+
+.remark-cell {
+  max-width: 180px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.date-cell {
+  min-width: 160px;
+  white-space: nowrap;
 }
 
 .type {
@@ -494,6 +533,16 @@ td {
 .type.deduct {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.type.unlock {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.type.default {
+  background: #e5e7eb;
+  color: #374151;
 }
 
 .empty {
