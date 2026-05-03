@@ -15,8 +15,9 @@ namespace FifaWorldCup.Api.Controllers
         }
 
         // GET: api/AdminMember/list
+        // GET: api/AdminMember/list?keyword=test
         [HttpGet("list")]
-        public IActionResult GetMemberList()
+        public IActionResult GetMemberList([FromQuery] string? keyword)
         {
             try
             {
@@ -35,6 +36,13 @@ namespace FifaWorldCup.Api.Controllers
                     FROM Members m
                     LEFT JOIN MemberAnswers ma
                         ON m.Id = ma.MemberId
+                    WHERE
+                        (
+                            @Keyword IS NULL
+                            OR @Keyword = ''
+                            OR m.Username LIKE '%' + @Keyword + '%'
+                            OR m.PhoneNumber LIKE '%' + @Keyword + '%'
+                        )
                     GROUP BY
                         m.Id,
                         m.Username,
@@ -45,6 +53,8 @@ namespace FifaWorldCup.Api.Controllers
                 ";
 
                 using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@Keyword", string.IsNullOrWhiteSpace(keyword) ? DBNull.Value : keyword.Trim());
+
                 using var reader = command.ExecuteReader();
 
                 var members = new List<object>();
