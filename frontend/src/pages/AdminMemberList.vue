@@ -31,38 +31,59 @@
         {{ errorMessage }}
       </div>
 
-      <div v-else class="table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Member ID</th>
-              <th>Username</th>
-              <th>Phone Number</th>
-              <th>Credit Balance</th>
-              <th>Answered Count</th>
-              <th>Last Answer Time</th>
-              <th>Created At</th>
-            </tr>
-          </thead>
+      <div v-else>
+        <div class="filter-card">
+          <div class="search-row">
+            <input
+              v-model="keyword"
+              type="text"
+              placeholder="Search by username or phone number"
+              @keyup.enter="searchMembers"
+            />
 
-          <tbody>
-            <tr v-if="members.length === 0">
-              <td colspan="7" class="empty">
-                No members found.
-              </td>
-            </tr>
+            <button type="button" class="search-button" @click="searchMembers">
+              Search
+            </button>
 
-            <tr v-for="member in members" :key="member.memberId">
-              <td>{{ member.memberId }}</td>
-              <td>{{ member.username }}</td>
-              <td>{{ member.phoneNumber || '-' }}</td>
-              <td>{{ member.creditBalance }}</td>
-              <td>{{ member.answeredCount }}</td>
-              <td>{{ formatDateTime(member.lastAnswerTime) }}</td>
-              <td>{{ formatDateTime(member.createdAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
+            <button type="button" class="reset-button" @click="resetSearch">
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Member ID</th>
+                <th>Username</th>
+                <th>Phone Number</th>
+                <th>Credit Balance</th>
+                <th>Answered Count</th>
+                <th>Last Answer Time</th>
+                <th>Created At</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr v-if="members.length === 0">
+                <td colspan="7" class="empty">
+                  No members found.
+                </td>
+              </tr>
+
+              <tr v-for="member in members" :key="member.memberId">
+                <td>{{ member.memberId }}</td>
+                <td>{{ member.username }}</td>
+                <td>{{ member.phoneNumber || '-' }}</td>
+                <td>{{ member.creditBalance }}</td>
+                <td>{{ member.answeredCount }}</td>
+                <td>{{ formatDateTime(member.lastAnswerTime) }}</td>
+                <td>{{ formatDateTime(member.createdAt) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </main>
   </div>
@@ -79,6 +100,7 @@ const API_BASE_URL = 'https://localhost:7160'
 const loading = ref(true)
 const errorMessage = ref('')
 const members = ref([])
+const keyword = ref('')
 
 function checkAdminLogin() {
   const adminId = localStorage.getItem('adminId')
@@ -91,8 +113,12 @@ function checkAdminLogin() {
   return true
 }
 
-async function loadMembers() {
-  const response = await fetch(`${API_BASE_URL}/api/AdminMember/list`)
+async function loadMembers(searchKeyword = '') {
+  const query = searchKeyword
+    ? `?keyword=${encodeURIComponent(searchKeyword)}`
+    : ''
+
+  const response = await fetch(`${API_BASE_URL}/api/AdminMember/list${query}`)
   const result = await response.json()
 
   if (!response.ok || result.status !== 'OK') {
@@ -100,6 +126,34 @@ async function loadMembers() {
   }
 
   members.value = result.data || []
+}
+
+async function searchMembers() {
+  try {
+    loading.value = true
+    errorMessage.value = ''
+
+    await loadMembers(keyword.value.trim())
+  } catch (error) {
+    errorMessage.value = error.message || 'Failed to search member list.'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function resetSearch() {
+  keyword.value = ''
+
+  try {
+    loading.value = true
+    errorMessage.value = ''
+
+    await loadMembers()
+  } catch (error) {
+    errorMessage.value = error.message || 'Failed to reset member list.'
+  } finally {
+    loading.value = false
+  }
 }
 
 function logout() {
@@ -223,6 +277,44 @@ nav a:hover {
 
 .error {
   color: #dc2626;
+}
+
+.filter-card {
+  margin-top: 28px;
+  padding: 18px 20px;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.search-row {
+  display: flex;
+  gap: 12px;
+}
+
+.search-row input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.search-button,
+.reset-button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+}
+
+.search-button {
+  background: #2563eb;
+}
+
+.reset-button {
+  background: #6b7280;
 }
 
 table {
