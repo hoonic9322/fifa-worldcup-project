@@ -1,169 +1,268 @@
 <template>
-  <div class="admin-dashboard">
-    <aside class="sidebar">
-      <h2>FIFA Admin</h2>
+  <div class="admin-page">
+    <aside class="admin-sidebar">
+      <h2 class="admin-logo">FIFA Admin</h2>
 
-     <nav>
-        <router-link to="/admin" class="active">Dashboard</router-link>
-        <router-link to="/admin/members">Members</router-link>
-        <router-link to="/admin/answers">Answers</router-link>
-         <router-link to="/admin/credit">Credit</router-link>
-        <router-link to="/admin/export">Export</router-link>
-​        ​</nav>
+      <nav class="admin-nav">
+        <router-link to="/admin/dashboard" class="admin-nav-link">
+          Dashboard
+        </router-link>
+        <router-link to="/admin/members" class="admin-nav-link">
+          Members
+        </router-link>
+        <router-link to="/admin/answers" class="admin-nav-link">
+          Answers
+        </router-link>
+        <router-link to="/admin/credit" class="admin-nav-link">
+          Credit
+        </router-link>
+        <router-link to="/admin/export" class="admin-nav-link">
+          Export
+        </router-link>
+      </nav>
     </aside>
 
-    <main class="main-content">
-      <div class="top-bar">
+    <main class="admin-main">
+      <div class="admin-header">
         <div>
           <h1>Admin Dashboard</h1>
-          <p>Welcome, {{ adminDisplayName || adminUsername }}</p>
+          <p>Welcome, System Admin</p>
         </div>
 
-        <button type="button" class="logout-button" @click="logout">
+        <button class="logout-button" @click="logout">
           Logout
         </button>
       </div>
 
-      <section class="card-grid">
-        <div class="card">
-          <h3>Member List</h3>
-          <p>Manage member records.</p>
+      <section v-if="loading" class="dashboard-message-card">
+        Loading dashboard summary...
+      </section>
+
+      <section v-else-if="errorMessage" class="dashboard-message-card error">
+        {{ errorMessage }}
+      </section>
+
+      <section v-else class="dashboard-grid">
+        <div class="dashboard-card">
+          <h3>Total Members</h3>
+          <p class="dashboard-number">{{ summary.totalMembers }}</p>
+          <span>Registered member records.</span>
         </div>
 
-        <div class="card">
-          <h3>Answer List</h3>
-          <p>View submitted answers.</p>
+        <div class="dashboard-card">
+          <h3>Total Questions</h3>
+          <p class="dashboard-number">{{ summary.totalQuestions }}</p>
+          <span>Campaign question records.</span>
         </div>
 
-        <div class="card">
-          <h3>Export Excel</h3>
-          <p>Export campaign data.</p>
+        <div class="dashboard-card">
+          <h3>Submitted Answers</h3>
+          <p class="dashboard-number">{{ summary.totalSubmittedAnswers }}</p>
+          <span>Member submitted answers.</span>
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Unlock Records</h3>
+          <p class="dashboard-number">{{ summary.totalUnlockRecords }}</p>
+          <span>Question unlock records.</span>
+        </div>
+
+        <div class="dashboard-card">
+          <h3>Credit Transactions</h3>
+          <p class="dashboard-number">{{ summary.totalCreditTransactions }}</p>
+          <span>Add, deduct, and unlock records.</span>
         </div>
       </section>
     </main>
   </div>
 </template>
 
-<script setup>
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+<script>
+export default {
+  name: "AdminDashboard",
 
-const router = useRouter()
+  data() {
+    return {
+      loading: false,
+      errorMessage: "",
+      summary: {
+        totalMembers: 0,
+        totalQuestions: 0,
+        totalSubmittedAnswers: 0,
+        totalUnlockRecords: 0,
+        totalCreditTransactions: 0
+      }
+    };
+  },
 
-const adminUsername = ref('')
-const adminDisplayName = ref('')
+  mounted() {
+    this.loadDashboardSummary();
+  },
 
-function logout() {
+  methods: {
+    async loadDashboardSummary() {
+      this.loading = true;
+      this.errorMessage = "";
+
+      try {
+        const response = await fetch(
+          "https://localhost:7160/api/admin/dashboard/summary"
+        );
+
+        const result = await response.json();
+
+        if (!response.ok || result.status !== "OK") {
+          throw new Error(result.message || "Failed to load dashboard summary.");
+        }
+
+        this.summary = result.data;
+      } catch (error) {
+        this.errorMessage =
+          error.message || "Failed to load dashboard summary.";
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    logout() {
   localStorage.removeItem('adminId')
   localStorage.removeItem('adminUsername')
   localStorage.removeItem('adminDisplayName')
 
-  router.push('/admin/login')
+  this.$router.push('/admin/login')
 }
-
-onMounted(() => {
-  const adminId = localStorage.getItem('adminId')
-
-  if (!adminId) {
-    router.push('/admin/login')
-    return
   }
-
-  adminUsername.value = localStorage.getItem('adminUsername') || ''
-  adminDisplayName.value = localStorage.getItem('adminDisplayName') || ''
-})
+};
 </script>
 
 <style scoped>
-.admin-dashboard {
-  min-height: 100vh;
+.admin-page {
   display: flex;
+  min-height: 100vh;
   background: #f3f4f6;
-  font-family: Arial, sans-serif;
+  color: #111827;
 }
 
-.sidebar {
-  width: 240px;
-  padding: 24px;
+.admin-sidebar {
+  width: 300px;
+  min-height: 100vh;
   background: #111827;
-  color: white;
+  color: #ffffff;
+  padding: 24px;
+  box-sizing: border-box;
 }
 
-.sidebar h2 {
-  margin: 0 0 28px;
+.admin-logo {
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 32px 0;
 }
 
-nav {
+.admin-nav {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-nav a {
-  padding: 10px 12px;
-  border-radius: 6px;
-  color: #d1d5db;
+.admin-nav-link {
+  color: #ffffff;
   text-decoration: none;
-  cursor: pointer;
+  font-size: 22px;
+  padding: 14px 20px;
+  border-radius: 8px;
+  text-align: center;
 }
 
-nav a.active,
-nav a:hover {
+.admin-nav-link.router-link-active,
+.admin-nav-link:hover {
   background: #1f2937;
-  color: white;
 }
 
-.main-content {
+.admin-main {
   flex: 1;
-  padding: 32px;
+  padding: 24px 40px;
+  box-sizing: border-box;
 }
 
-.top-bar {
+.admin-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 40px;
 }
 
-.top-bar h1 {
+.admin-header h1 {
+  font-size: 64px;
+  line-height: 1;
   margin: 0;
   color: #111827;
 }
 
-.top-bar p {
-  margin: 6px 0 0;
+.admin-header p {
+  font-size: 22px;
   color: #6b7280;
+  margin: 0;
+  text-align: center;
 }
 
 .logout-button {
-  padding: 10px 16px;
-  border: none;
-  border-radius: 6px;
   background: #dc2626;
-  color: white;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 24px;
+  font-size: 16px;
   cursor: pointer;
 }
 
-.card-grid {
+.logout-button:hover {
+  background: #b91c1c;
+}
+
+.dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-top: 32px;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 24px;
 }
 
-.card {
-  padding: 22px;
-  border-radius: 10px;
-  background: white;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+.dashboard-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 28px 24px;
+  text-align: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
 }
 
-.card h3 {
-  margin: 0 0 10px;
+.dashboard-card h3 {
+  font-size: 24px;
+  margin: 0 0 12px 0;
   color: #111827;
 }
 
-.card p {
-  margin: 0;
+.dashboard-number {
+  font-size: 42px;
+  font-weight: 700;
+  margin: 0 0 10px 0;
+  color: #111827;
+}
+
+.dashboard-card span {
+  font-size: 18px;
   color: #6b7280;
+}
+
+.dashboard-message-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  font-size: 20px;
+  text-align: center;
+  color: #374151;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.dashboard-message-card.error {
+  color: #dc2626;
 }
 </style>

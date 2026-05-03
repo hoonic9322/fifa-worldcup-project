@@ -59,16 +59,73 @@ namespace FifaWorldCup.Api.Controllers
                 using var connection = new SqlConnection(_configuration.GetConnectionString("DefaultConnection"));
                 connection.Open();
 
-                // Check duplicate answer
+                // 1. Check question exists
+                var questionCheckSql = @"
+                    SELECT COUNT(1)
+                    FROM Questions
+                    WHERE Id = @QuestionId
+                ";
+
+                using (var questionCheckCommand = new SqlCommand(questionCheckSql, connection))
+                {
+                    questionCheckCommand.Parameters.AddWithValue("@QuestionId", request.QuestionId);
+
+                    var questionCount = (int)questionCheckCommand.ExecuteScalar();
+
+                    if (questionCount <= 0)
+                    {
+                        return BadRequest(new
+                        {
+                            status = "ERROR",
+                            message = "Question not found."
+                        });
+                    }
+                }
+
+                // 2. Check whether this question is unlocked for this member
+                var unlockCheckSql = @"
+                    SELECT
+                        CASE
+                            WHEN q.IsLocked = 0 THEN CAST(1 AS BIT)
+                            WHEN mqu.Id IS NOT NULL THEN CAST(1 AS BIT)
+                            ELSE CAST(0 AS BIT)
+                        END AS CanSubmit
+                    FROM Questions q
+                    LEFT JOIN MemberQuestionUnlocks mqu
+                        ON q.Id = mqu.QuestionId
+                        AND mqu.MemberId = @MemberId
+                    WHERE q.Id = @QuestionId
+                ";
+
+                using (var unlockCheckCommand = new SqlCommand(unlockCheckSql, connection))
+                {
+                    unlockCheckCommand.Parameters.AddWithValue("@MemberId", request.MemberId);
+                    unlockCheckCommand.Parameters.AddWithValue("@QuestionId", request.QuestionId);
+
+                    var canSubmitObj = unlockCheckCommand.ExecuteScalar();
+
+                    if (canSubmitObj == null || canSubmitObj == DBNull.Value || !(bool)canSubmitObj)
+                    {
+                        return BadRequest(new
+                        {
+                            status = "ERROR",
+                            message = "This question is locked. Please unlock it before submitting an answer."
+                        });
+                    }
+                }
+
+                // 3. Check duplicate answer by MemberId + QuestionId
                 var checkSql = @"
                     SELECT COUNT(1)
                     FROM MemberAnswers
                     WHERE MemberId = @MemberId
+                      AND QuestionId = @QuestionId
                 ";
 
                 using (var checkCommand = new SqlCommand(checkSql, connection))
                 {
                     checkCommand.Parameters.AddWithValue("@MemberId", request.MemberId);
+                    checkCommand.Parameters.AddWithValue("@QuestionId", request.QuestionId);
 
                     var existingCount = (int)checkCommand.ExecuteScalar();
 
@@ -77,12 +134,12 @@ namespace FifaWorldCup.Api.Controllers
                         return BadRequest(new
                         {
                             status = "ERROR",
-                            message = "You have already submitted an answer."
+                            message = "You have already submitted an answer for this question."
                         });
                     }
                 }
 
-                // Insert answer
+                // 4. Insert answer
                 var insertSql = @"
                     INSERT INTO MemberAnswers
                     (
@@ -91,6 +148,7 @@ namespace FifaWorldCup.Api.Controllers
                         AnswerText,
                         CreatedAt
                     )
+                    OUTPUT INSERTED.Id, INSERTED.CreatedAt
                     VALUES
                     (
                         @MemberId,
@@ -105,12 +163,29 @@ namespace FifaWorldCup.Api.Controllers
                 insertCommand.Parameters.AddWithValue("@QuestionId", request.QuestionId);
                 insertCommand.Parameters.AddWithValue("@AnswerText", request.AnswerText.Trim());
 
-                insertCommand.ExecuteNonQuery();
+                using var reader = insertCommand.ExecuteReader();
+
+                int answerId = 0;
+                DateTime createdAt = DateTime.Now;
+
+                if (reader.Read())
+                {
+                    answerId = reader.GetInt32(reader.GetOrdinal("Id"));
+                    createdAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt"));
+                }
 
                 return Ok(new
                 {
                     status = "OK",
-                    message = "Answer submitted successfully."
+                    message = "Answer submitted successfully.",
+                    data = new
+                    {
+                        id = answerId,
+                        memberId = request.MemberId,
+                        questionId = request.QuestionId,
+                        answerText = request.AnswerText.Trim(),
+                        submittedAt = createdAt
+                    }
                 });
             }
             catch (Exception ex)

@@ -16,30 +16,15 @@
         {{ errorMessage }}
       </div>
 
-      <div v-else-if="submittedAnswer" class="submitted-box">
-        <h2>You have submitted your answer</h2>
-
-        <p>
-          <strong>Question ID:</strong>
-          {{ submittedAnswer.questionId }}
-        </p>
-
-        <p>
-          <strong>Your Answer:</strong>
-          {{ submittedAnswer.answerText }}
-        </p>
-
-        <p>
-          <strong>Submitted Time:</strong>
-          {{ formatDateTime(submittedAnswer.submittedAt) }}
-        </p>
-      </div>
-
       <div v-else>
         <div
           v-for="question in questions"
           :key="question.id"
           class="question-item"
+          :class="{
+            'submitted-question': question.hasSubmitted,
+            'locked-question': question.isLocked && !question.isUnlocked
+          }"
         >
           <div class="question-header">
             <span class="pool-tag">
@@ -47,7 +32,14 @@
             </span>
 
             <span
-              v-if="question.isLocked && !question.isUnlocked"
+              v-if="question.hasSubmitted"
+              class="submitted-tag"
+            >
+              Submitted
+            </span>
+
+            <span
+              v-else-if="question.isLocked && !question.isUnlocked"
               class="lock-tag"
             >
               Locked
@@ -59,11 +51,41 @@
             >
               Unlocked
             </span>
+
+            <span
+              v-else
+              class="free-tag"
+            >
+              Free
+            </span>
           </div>
 
-          <h2>{{ question.questionText }}</h2>
+          <h2>
+            Question {{ question.id }}:
+            {{ question.questionText }}
+          </h2>
 
-          <div v-if="question.canAnswer" class="answer-area">
+          <!-- Case 1: This question already submitted -->
+          <div v-if="question.hasSubmitted" class="submitted-box">
+            <h3>You have submitted this answer</h3>
+
+            <p>
+              <strong>Your Answer:</strong>
+              {{ question.submittedAnswer || '-' }}
+            </p>
+
+            <p>
+              <strong>Submitted Time:</strong>
+              {{ formatDateTime(question.submittedAt) }}
+            </p>
+
+            <p class="submitted-note">
+              This answer has been submitted and cannot be edited.
+            </p>
+          </div>
+
+          <!-- Case 2: This question can answer -->
+          <div v-else-if="question.canAnswer" class="answer-area">
             <input
               v-model="answers[question.id]"
               type="text"
@@ -72,24 +94,38 @@
 
             <button
               type="button"
-              :disabled="submitting"
+              :disabled="submittingQuestionId === question.id"
               @click="submitAnswer(question.id)"
             >
-              Submit Answer
+              {{
+                submittingQuestionId === question.id
+                  ? 'Submitting...'
+                  : 'Submit Answer'
+              }}
             </button>
           </div>
 
+          <!-- Case 3: This question is locked -->
           <div v-else class="unlock-area">
-            <p>This question requires credit to unlock.</p>
+            <p>This question is locked.</p>
+            <p>Deposit RM1,000 to unlock this question.</p>
 
             <button
               type="button"
-              :disabled="unlocking"
+              :disabled="unlockingQuestionId === question.id"
               @click="unlockQuestion(question.id)"
             >
-              {{ unlocking ? 'Unlocking...' : 'Unlock Question - 10 Credit' }}
+              {{
+                unlockingQuestionId === question.id
+                  ? 'Unlocking...'
+                  : 'Unlock Question - 10 Credit'
+              }}
             </button>
           </div>
+        </div>
+
+        <div v-if="questions.length === 0" class="message-box">
+          No questions found.
         </div>
       </div>
 
@@ -110,12 +146,12 @@ const API_BASE_URL = 'https://localhost:7160'
 const UNLOCK_CREDIT_COST = 10
 
 const loading = ref(true)
-const submitting = ref(false)
-const unlocking = ref(false)
 const errorMessage = ref('')
 const questions = ref([])
 const answers = ref({})
-const submittedAnswer = ref(null)
+
+const submittingQuestionId = ref(null)
+const unlockingQuestionId = ref(null)
 
 const memberId = ref(localStorage.getItem('memberId'))
 const memberUsername = ref(localStorage.getItem('memberUsername'))
@@ -144,18 +180,6 @@ async function loadQuestions() {
   questions.value = result.data || []
 }
 
-async function loadSubmittedAnswer() {
-  const response = await fetch(`${API_BASE_URL}/api/Answer/member/${memberId.value}`)
-  const result = await response.json()
-
-  if (!response.ok || result.status !== 'OK') {
-    submittedAnswer.value = null
-    return
-  }
-
-  submittedAnswer.value = result.data
-}
-
 async function submitAnswer(questionId) {
   try {
     errorMessage.value = ''
@@ -167,7 +191,7 @@ async function submitAnswer(questionId) {
       return
     }
 
-    submitting.value = true
+    submittingQuestionId.value = questionId
 
     const response = await fetch(`${API_BASE_URL}/api/Answer/submit`, {
       method: 'POST',
@@ -188,18 +212,20 @@ async function submitAnswer(questionId) {
       return
     }
 
-    submittedAnswer.value = result.data
+    answers.value[questionId] = ''
+
+    await loadQuestions()
   } catch (error) {
     errorMessage.value = error.message || 'Unexpected error occurred.'
   } finally {
-    submitting.value = false
+    submittingQuestionId.value = null
   }
 }
 
 async function unlockQuestion(questionId) {
   try {
     errorMessage.value = ''
-    unlocking.value = true
+    unlockingQuestionId.value = questionId
 
     const response = await fetch(`${API_BASE_URL}/api/QuestionUnlock/unlock`, {
       method: 'POST',
@@ -229,7 +255,7 @@ async function unlockQuestion(questionId) {
   } catch (error) {
     errorMessage.value = error.message || 'Unexpected error occurred.'
   } finally {
-    unlocking.value = false
+    unlockingQuestionId.value = null
   }
 }
 
@@ -265,7 +291,6 @@ onMounted(async () => {
     loading.value = true
     errorMessage.value = ''
 
-    await loadSubmittedAnswer()
     await loadQuestions()
   } catch (error) {
     errorMessage.value = error.message || 'Failed to load question page.'
@@ -289,7 +314,7 @@ onMounted(async () => {
 
 .question-card {
   width: 100%;
-  max-width: 820px;
+  max-width: 920px;
   text-align: center;
 }
 
@@ -304,7 +329,6 @@ h1 {
 }
 
 .message-box,
-.submitted-box,
 .question-item {
   margin-top: 20px;
   padding: 24px;
@@ -317,24 +341,31 @@ h1 {
   color: #dc2626;
 }
 
-.submitted-box {
-  background: #ecfdf5;
-  border: 1px solid #bbf7d0;
-}
-
 .question-item {
   text-align: left;
+}
+
+.submitted-question {
+  border: 1px solid #bbf7d0;
+  background: #ecfdf5;
+}
+
+.locked-question {
+  opacity: 0.95;
 }
 
 .question-header {
   display: flex;
   gap: 10px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .pool-tag,
 .lock-tag,
-.unlock-tag {
+.unlock-tag,
+.submitted-tag,
+.free-tag {
   display: inline-block;
   padding: 5px 10px;
   border-radius: 999px;
@@ -357,9 +388,20 @@ h1 {
   color: #166534;
 }
 
+.submitted-tag {
+  background: #bbf7d0;
+  color: #065f46;
+}
+
+.free-tag {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .question-item h2 {
   margin: 0 0 18px;
   font-size: 22px;
+  line-height: 1.4;
 }
 
 .answer-area {
@@ -391,6 +433,32 @@ button {
 button:disabled {
   background: #93c5fd;
   cursor: not-allowed;
+}
+
+.submitted-box {
+  padding: 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #bbf7d0;
+  color: #111827;
+  text-align: center;
+}
+
+.submitted-box h3 {
+  margin: 0 0 12px;
+  color: #065f46;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.submitted-box p {
+  margin: 8px 0;
+}
+
+.submitted-note {
+  margin-top: 12px;
+  color: #6b7280;
+  font-size: 14px;
 }
 
 .unlock-area {

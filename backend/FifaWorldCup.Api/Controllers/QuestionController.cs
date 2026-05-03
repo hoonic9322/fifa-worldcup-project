@@ -31,20 +31,39 @@ namespace FifaWorldCup.Api.Controllers
                         q.QuestionText,
                         q.IsLocked,
                         q.CreatedAt,
+
                         CASE
                             WHEN q.IsLocked = 0 THEN CAST(1 AS BIT)
                             WHEN mqu.Id IS NOT NULL THEN CAST(1 AS BIT)
                             ELSE CAST(0 AS BIT)
                         END AS IsUnlocked,
+
                         CASE
-                            WHEN q.IsLocked = 0 THEN CAST(1 AS BIT)
-                            WHEN mqu.Id IS NOT NULL THEN CAST(1 AS BIT)
+                            WHEN ma.Id IS NOT NULL THEN CAST(1 AS BIT)
+                            ELSE CAST(0 AS BIT)
+                        END AS HasSubmitted,
+
+                        ma.AnswerText AS SubmittedAnswer,
+                        ma.CreatedAt AS SubmittedAt,
+
+                        CASE
+                            WHEN 
+                                (
+                                    q.IsLocked = 0
+                                    OR mqu.Id IS NOT NULL
+                                )
+                                AND ma.Id IS NULL
+                            THEN CAST(1 AS BIT)
                             ELSE CAST(0 AS BIT)
                         END AS CanAnswer
+
                     FROM Questions q
                     LEFT JOIN MemberQuestionUnlocks mqu
                         ON q.Id = mqu.QuestionId
                         AND mqu.MemberId = @MemberId
+                    LEFT JOIN MemberAnswers ma
+                        ON q.Id = ma.QuestionId
+                        AND ma.MemberId = @MemberId
                     ORDER BY q.Id ASC
                 ";
 
@@ -59,20 +78,38 @@ namespace FifaWorldCup.Api.Controllers
 
                 while (reader.Read())
                 {
+                    var questionText = reader.GetString(reader.GetOrdinal("QuestionText"));
                     var isLocked = reader.GetBoolean(reader.GetOrdinal("IsLocked"));
                     var isUnlocked = reader.GetBoolean(reader.GetOrdinal("IsUnlocked"));
+                    var hasSubmitted = reader.GetBoolean(reader.GetOrdinal("HasSubmitted"));
                     var canAnswer = reader.GetBoolean(reader.GetOrdinal("CanAnswer"));
+
+                    var submittedAnswerOrdinal = reader.GetOrdinal("SubmittedAnswer");
+                    var submittedAtOrdinal = reader.GetOrdinal("SubmittedAt");
+
+                    string? submittedAnswer = reader.IsDBNull(submittedAnswerOrdinal)
+                        ? null
+                        : reader.GetString(submittedAnswerOrdinal);
+
+                    DateTime? submittedAt = reader.IsDBNull(submittedAtOrdinal)
+                        ? null
+                        : reader.GetDateTime(submittedAtOrdinal);
 
                     questions.Add(new
                     {
                         id = reader.GetInt32(reader.GetOrdinal("Id")),
                         prizePoolType = reader.GetString(reader.GetOrdinal("PrizePoolType")),
-                        questionText = canAnswer
-                            ? reader.GetString(reader.GetOrdinal("QuestionText"))
+
+                        questionText = isUnlocked || hasSubmitted
+                            ? questionText
                             : "This question is locked.",
-                        originalQuestionText = reader.GetString(reader.GetOrdinal("QuestionText")),
+
+                        originalQuestionText = questionText,
                         isLocked,
                         isUnlocked,
+                        hasSubmitted,
+                        submittedAnswer,
+                        submittedAt,
                         canAnswer,
                         createdAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt"))
                     });
@@ -105,9 +142,17 @@ namespace FifaWorldCup.Api.Controllers
 
         public string QuestionText { get; set; } = string.Empty;
 
+        public string OriginalQuestionText { get; set; } = string.Empty;
+
         public bool IsLocked { get; set; }
 
         public bool IsUnlocked { get; set; }
+
+        public bool HasSubmitted { get; set; }
+
+        public string? SubmittedAnswer { get; set; }
+
+        public DateTime? SubmittedAt { get; set; }
 
         public bool CanAnswer { get; set; }
 
