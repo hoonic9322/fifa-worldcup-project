@@ -8,6 +8,7 @@ import AdminDashboard from '../pages/AdminDashboard.vue'
 import AdminMemberList from '../pages/AdminMemberList.vue'
 import AdminAnswerList from '../pages/AdminAnswerList.vue'
 import AdminExport from '../pages/AdminExport.vue'
+import AdminCredit from '../pages/AdminCredit.vue'
 
 const routes = [
   {
@@ -49,6 +50,11 @@ const routes = [
   path: '/admin/export',
   name: 'AdminExport',
   component: AdminExport,
+},
+{
+  path: '/admin/credit',
+  name: 'AdminCredit',
+  component: AdminCredit,
 },
 ]
 

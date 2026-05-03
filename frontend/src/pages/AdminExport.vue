@@ -7,6 +7,7 @@
         <router-link to="/admin">Dashboard</router-link>
         <router-link to="/admin/members">Members</router-link>
         <router-link to="/admin/answers">Answers</router-link>
+         <router-link to="/admin/credit">Credit</router-link>
         <router-link to="/admin/export" class="active">Export</router-link>
       </nav>
     </aside>
