@@ -16,8 +16,13 @@ namespace FifaWorldCup.Api.Controllers
 
         // GET: api/AdminMember/list
         // GET: api/AdminMember/list?keyword=test
+        // GET: api/AdminMember/list?answerStatus=answered
+        // GET: api/AdminMember/list?answerStatus=notAnswered
+        // GET: api/AdminMember/list?keyword=test&answerStatus=answered
         [HttpGet("list")]
-        public IActionResult GetMemberList([FromQuery] string? keyword)
+        public IActionResult GetMemberList(
+            [FromQuery] string? keyword,
+            [FromQuery] string? answerStatus)
         {
             try
             {
@@ -49,11 +54,28 @@ namespace FifaWorldCup.Api.Controllers
                         m.PhoneNumber,
                         m.CreditBalance,
                         m.CreatedAt
+                    HAVING
+                        (
+                            @AnswerStatus IS NULL
+                            OR @AnswerStatus = ''
+                            OR @AnswerStatus = 'all'
+                            OR (@AnswerStatus = 'answered' AND COUNT(ma.Id) > 0)
+                            OR (@AnswerStatus = 'notAnswered' AND COUNT(ma.Id) = 0)
+                        )
                     ORDER BY m.Id DESC
                 ";
 
                 using var command = new SqlCommand(sql, connection);
-                command.Parameters.AddWithValue("@Keyword", string.IsNullOrWhiteSpace(keyword) ? DBNull.Value : keyword.Trim());
+
+                command.Parameters.AddWithValue(
+                    "@Keyword",
+                    string.IsNullOrWhiteSpace(keyword) ? DBNull.Value : keyword.Trim()
+                );
+
+                command.Parameters.AddWithValue(
+                    "@AnswerStatus",
+                    string.IsNullOrWhiteSpace(answerStatus) ? DBNull.Value : answerStatus.Trim()
+                );
 
                 using var reader = command.ExecuteReader();
 
